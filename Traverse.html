@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traverse Survey Calculation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 0;
+        }
+        table {
+            width: 80%;
+            margin: 20px auto;
+            border-collapse: collapse;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            background-color: #fff;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+            text-align: center;
+            padding: 12px;
+        }
+        th {
+            background-color: #6f8398;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        tr:hover {
+            background-color: #e9ecef;
+        }
+        input {
+            width: 100px;
+            padding: 5px;
+            text-align: center;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        .button-container {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .red-text {
+            color: red;
+        }
+        .bold-text {
+            font-weight: bold;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<h2 style="text-align: center;">Traverse Survey Computation</h2>
+
+<button onclick="fillDummyData()">Fill Dummy Data</button>
+
+<table>
+    <thead>
+        <tr>
+            <th>Station</th>
+            <th>Easting</th>
+            <th>Northing</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><input type="text" id="station1" value="Station 1"></td>
+            <td><input type="number" id="initialEasting1" class="red-text"></td>
+            <td><input type="number" id="initialNorthing1" class="red-text"></td>
+        </tr>
+        <tr>
+            <td><input type="text" id="station2" value="Station 2"></td>
+            <td><input type="number" id="initialEasting2" class="red-text"></td>
+            <td><input type="number" id="initialNorthing2" class="red-text"></td>
+        </tr>
+    </tbody>
+</table>
+
+<div style="text-align: center;">
+    <label for="numAngles">Number of Angles (Stations): </label>
+    <input type="number" id="numAngles" min="1">
+    <button onclick="generateRows()">Set Number of Angles</button>
+</div>
+
+<div class="button-container">
+    <button onclick="computeTraverse()">Compute Traverse</button>
+    <button onclick="exportToExcel()">Export to Excel</button>
+</div>
+
+<table>
+    <thead>
+        <tr>
+            <th>Station</th>
+            <th>Distance (m)</th>
+            <th>Bearing (degrees)</th>
+            <th>ΔE (Easting)</th>
+            <th>ΔN (Northing)</th>
+            <th>Correction Easting</th>
+            <th>Correction Northing</th>
+            <th>Easting</th>
+            <th>Northing</th>
+        </tr>
+    </thead>
+    <tbody id="traverseTable">
+        <!-- Rows will be dynamically added here -->
+    </tbody>
+    <tfoot>
+        <tr class="bold-text">
+            <td>Total</td>
+            <td id="totalDistance"></td>
+            <td></td>
+            <td id="totalDeltaE"></td>
+            <td id="totalDeltaN"></td>
+            <td id="totalErrorE" class="red-text"></td>
+            <td id="totalErrorN" class="red-text"></td>
+            <td></td>
+            <td></td>
+        </tr>
+    </tfoot>
+</table>
+
+<script>
+    function generateRows() {
+        const numAngles = parseInt(document.getElementById('numAngles').value);
+        if (isNaN(numAngles) || numAngles <= 0) {
+            alert("Please enter a valid positive number.");
+            return;
+        }
+
+        const tableBody = document.getElementById('traverseTable');
+        tableBody.innerHTML = ''; // Clear existing rows
+
+        // Add the first row with the same name and coordinates as the second row of the first table
+        const station2 = document.getElementById('station2').value;
+        const initialEasting2 = document.getElementById('initialEasting2').value;
+        const initialNorthing2 = document.getElementById('initialNorthing2').value;
+
+        const firstRow = document.createElement('tr');
+        firstRow.innerHTML = `
+            <td class="red-text">${station2}</td>
+            <td class="red-text"></td>
+            <td class="red-text"></td>
+            <td class="red-text"></td>
+            <td class="red-text"></td>
+            <td class="red-text"></td>
+            <td class="red-text"></td>
+            <td class="red-text">${initialEasting2}</td>
+            <td class="red-text">${initialNorthing2}</td>
+        `;
+        tableBody.appendChild(firstRow);
+
+        for (let i = 1; i <= numAngles; i++) {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td><input type="number" id="station${i}" value="${1000 + i}"></td>
+                <td><input type="number" id="distance${i}"></td>
+                <td><input type="number" id="bearing${i}"></td>
+                <td id="deltaE${i}"></td>
+                <td id="deltaN${i}"></td>
+                <td id="errorE${i}" class="red-text"></td>
+                <td id="errorN${i}" class="red-text"></td>
+                <td id="cumulativeE${i}"></td>
+                <td id="cumulativeN${i}"></td>
+            `;
+            tableBody.appendChild(row);
+        }
+    }
+
+    function computeTraverse() {
+        // Get initial coordinates from the input fields
+        const initialEasting1 = parseFloat(document.getElementById('initialEasting1').value);
+        const initialNorthing1 = parseFloat(document.getElementById('initialNorthing1').value);
+        const initialEasting2 = parseFloat(document.getElementById('initialEasting2').value);
+        const initialNorthing2 = parseFloat(document.getElementById('initialNorthing2').value);
+
+        // Check for valid input
+        if (isNaN(initialEasting1) || isNaN(initialNorthing1) || isNaN(initialEasting2) || isNaN(initialNorthing2)) {
+            alert('Please enter valid numeric values for initial coordinates.');
+            return;
+        }
+
+        // Initial Coordinates (assuming the first station's coordinates)
+        let cumulativeE = initialEasting1;
+        let cumulativeN = initialNorthing1;
+
+        // Initialize total sums
+        let totalDistance = 0;
+        let totalDeltaE = 0;
+        let totalDeltaN = 0;
+        let totalErrorE = 0;
+        let totalErrorN = 0;
+
+        // Get the number of rows in the table
+        const numRows = document.getElementById('traverseTable').rows.length;
+
+        // First pass to calculate total sums
+        for (let i = 1; i < numRows; i++) { // Start from 1 to skip the first row
+            // Get distance and bearing input values
+            const distance = parseFloat(document.getElementById(`distance${i}`).value);
+            const bearing = parseFloat(document.getElementById(`bearing${i}`).value);
+
+            // Check for valid input
+            if (isNaN(distance) || isNaN(bearing)) {
+                alert('Please enter valid numeric values for distance and bearing.');
+                return;
+            }
+
+            // Convert bearing from degrees to radians
+            const bearingRadians = bearing * Math.PI / 180;
+
+            // Calculate ΔE and ΔN
+            const deltaE = distance * Math.sin(bearingRadians);
+            const deltaN = distance * Math.cos(bearingRadians);
+
+            // Update total sums
+            totalDistance += distance;
+            totalDeltaE += deltaE;
+            totalDeltaN += deltaN;
+        }
+
+        // Second pass to calculate and display results
+        let previousEasting = initialEasting2;
+        let previousNorthing = initialNorthing2;
+
+        for (let i = 1; i < numRows; i++) { // Start from 1 to skip the first row
+            // Get distance and bearing input values
+            const distance = parseFloat(document.getElementById(`distance${i}`).value);
+            const bearing = parseFloat(document.getElementById(`bearing${i}`).value);
+
+            // Convert bearing from degrees to radians
+            const bearingRadians = bearing * Math.PI / 180;
+
+            // Calculate ΔE and ΔN
+            const deltaE = distance * Math.sin(bearingRadians);
+            const deltaN = distance * Math.cos(bearingRadians);
+
+            // Calculate error values
+            const errorE = (totalDeltaE / totalDistance) * distance;
+            const errorN = (totalDeltaN / totalDistance) * distance;
+
+            // Update total error sums
+            totalErrorE += errorE;
+            totalErrorN += errorN;
+
+            // Calculate corrected Easting and Northing
+            const correctedEasting = previousEasting + deltaE - errorE;
+            const correctedNorthing = previousNorthing + deltaN - errorN;
+
+            // Display results in the table
+            document.getElementById(`deltaE${i}`).innerText = deltaE.toFixed(2);
+            document.getElementById(`deltaN${i}`).innerText = deltaN.toFixed(2);
+            document.getElementById(`errorE${i}`).innerText = (-errorE).toFixed(2);
+            document.getElementById(`errorN${i}`).innerText = (-errorN).toFixed(2);
+            document.getElementById(`cumulativeE${i}`).innerText = correctedEasting.toFixed(2);
+            document.getElementById(`cumulativeN${i}`).innerText = correctedNorthing.toFixed(2);
+
+            // Update previous Easting and Northing for the next iteration
+            previousEasting = correctedEasting;
+            previousNorthing = correctedNorthing;
+
+            // Make the last coordinate red
+            if (i === numRows - 1) {
+                document.getElementById(`cumulativeE${i}`).classList.add('red-text');
+                document.getElementById(`cumulativeN${i}`).classList.add('red-text');
+            }
+        }
+
+        // Display total sums
+        document.getElementById('totalDistance').innerText = totalDistance.toFixed(2);
+        document.getElementById('totalDeltaE').innerText = totalDeltaE.toFixed(2);
+        document.getElementById('totalDeltaN').innerText = totalDeltaN.toFixed(2);
+        document.getElementById('totalErrorE').innerText = (-totalErrorE).toFixed(2);
+        document.getElementById('totalErrorN').innerText = (-totalErrorN).toFixed(2);
+    }
+
+    function fillDummyData() {
+        // Dummy data for initial coordinates
+        document.getElementById('initialEasting1').value = 500000;
+        document.getElementById('initialNorthing1').value = 3057000;
+        document.getElementById('initialEasting2').value = 500250;
+        document.getElementById('initialNorthing2').value = 3057600;
+
+        // Dummy data for traverse table
+        const dummyData = [
+            { distance: 100, bearing: 89 },
+            { distance: 99, bearing: 181 },
+            { distance: 98, bearing: 272 },
+            { distance: 101, bearing: 358 }
+        ];
+
+        const numAngles = dummyData.length;
+        document.getElementById('numAngles').value = numAngles;
+        generateRows();
+
+        for (let i = 1; i <= numAngles; i++) {
+            document.getElementById(`distance${i}`).value = dummyData[i - 1].distance;
+            document.getElementById(`bearing${i}`).value = dummyData[i - 1].bearing;
+        }
+    }
+
+    function exportToExcel() {
+        const wb = XLSX.utils.book_new();
+        const ws_data = [
+            ["Station", "Distance (m)", "Bearing (degrees)", "ΔE (Easting)", "ΔN (Northing)", "Correction Easting", "Correction Northing", "Easting", "Northing"]
+        ];
+
+        const numRows = document.getElementById('traverseTable').rows.length;
+        for (let i = 1; i < numRows; i++) { // Start from 1 to skip the first row
+            const row = [
+                document.getElementById(`station${i}`).value,
+                document.getElementById(`distance${i}`).value,
+                document.getElementById(`bearing${i}`).value,
+                document.getElementById(`deltaE${i}`).innerText,
+                document.getElementById(`deltaN${i}`).innerText,
+                document.getElementById(`errorE${i}`).innerText,
+                document.getElementById(`errorN${i}`).innerText,
+                document.getElementById(`cumulativeE${i}`).innerText,
+                document.getElementById(`cumulativeN${i}`).innerText
+            ];
+            ws_data.push(row);
+        }
+
+        const ws = XLSX.utils.aoa_to_sheet(ws_data);
+        XLSX.utils.book_append_sheet(wb, ws, "Traverse Data");
+        XLSX.writeFile(wb, "traverse_data.xlsx");
+    }
+</script>
+
+</body>
+</html>
+
+<!-- Padding for comfortable scrolling -->
+<div style="height: 200px;"></div>
+
+
+<hr>
+
+<section style="text-align: center; margin: 20px 0;">
+    <h3>Credits</h3>
+    <p>Developed by Mr. Aman Manandhar</p>
+    <img src="pp.jpg" alt="Credits Image" style="border-radius: 8px; width: 150px;">
+</section>
